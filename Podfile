@@ -6,6 +6,6 @@ target 'KinHelloWorld' do
   use_frameworks!
 
   # Pods for KinHelloWorld
-  pod 'KinSDK'
+  pod 'KinSDK', '~> 0.8.0’
 
 end

@@ -5,8 +5,7 @@ This tutorial will help you get started with the Kin SDK for iOS.
 If you are reading this, you are already interested in cryptocurrencies and the blockchain, and you probably know
 that using the Kin ecosystem in your product is going to open new and fun ways for your users to cooperate and use
 your product.
-Get the full introduction about the Kin ecosystem [here](https://kinecosystem.github
-.io/kin-ecosystem-sdk-docs/docs/intro.html).
+Get the full introduction about the Kin ecosystem [here](https://kinecosystem.github.io/kin-ecosystem-sdk-docs/docs/intro.html).
 
 
 ## Install the Kin SDK with [Cocoapods](https://cocoapods.org/)
@@ -24,7 +23,7 @@ If you ran `pod install` for the first time, close the`.xcproject` and open the 
 
 ## The environments
 
-In this tutorial, we are using the test environment. The test environment allows us to create accounts, fund them and
+In this tutorial, we are using the playground environment. The playground environment allows us to create accounts, fund them and
  send kins between accounts via transactions, all with the purpose of getting started and testing our app.
 
 Transition to the main environment when your app is ready for production. The main environment works similarly,
@@ -39,21 +38,21 @@ Add `import KinSDK` at the top of your file.
 
 ### Initialize the Kin client
 
-The SDK client manages accounts. As we are using the test environment, the credentials used for the initialization
+The SDK client manages accounts. As we are using the playground environment, the credentials used for the initialization
 are fixed.
 
 In your view controller, add this function. 
 
-```
+```swift
 /**
-Initializes the Kin Client with the test environment.
+Initializes the Kin Client with the playground environment.
 */
-func initializeKinClientOnTestNetwork() -> KinClient? {
-    let url = "http://horizon-testnet.kininfrastructure.com"
+func initializeKinClientOnPlaygroundNetwork() -> KinClient? {
+    let url = "http://horizon-playground.kininfrastructure.com"
     guard let providerUrl = URL(string: url) else { return nil }
     do {
         let appId = try AppId("test")
-        return KinClient(with: providerUrl, network: .testNet, appId: appId)
+        return KinClient(with: providerUrl, network: .playground, appId: appId)
     } catch let error {
         print("Error \(error)")
     }
@@ -63,12 +62,12 @@ func initializeKinClientOnTestNetwork() -> KinClient? {
 
 And for instance in your viewDidLoad, call to initialize the client:
 
-`let kinClient: KinClient! = initializeKinClientOnTestNetwork()`
+`let kinClient: KinClient! = initializeKinClientOnPlaygroundNetwork()`
 
 ### Info.plist
 
 Let’s quickly configure the `Info.plist` file to allow HTTP requests:
-```
+```swift
 <key>NSAppTransportSecurity</key>
 <dict>
     <key>NSAllowsArbitraryLoads</key>
@@ -84,7 +83,7 @@ If an account is available from the local store, you can get it with
 `let account = kinClient.accounts.first`
 
 If no account is available, you create one
-```
+```swift
 do {
     let account = try kinClient.addAccount()
     return account
@@ -98,7 +97,7 @@ Once the account has been added, it will be stored locally and you can then retr
 
 A Kin account is identified via its public address, retrieved with `.publicAddress`.
 
-```
+```swift
 account.publicAddress
 ```
 
@@ -110,7 +109,7 @@ If you want to make sure there are no account stored locally, delete the first a
 
 :warning: If the account has not been backed up previously by exporting it, it will be lost and its kins inaccessible.
 
-```
+```swift
 /**
 Delete the first stored account of the client.
 */
@@ -129,30 +128,30 @@ func deleteFirstAccount(kinClient: KinClient) {
 If you have just created the account locally with `kinClient.addAccount()`, you still need to create that account on
 the blockchain in order to query its status, balance or exchange transactions.
 
-```
+```swift
 /**
-Create the given stored account on the test blockchain.
+Create the given stored account on the playground blockchain.
 */
-func createTestAccountOnBlockchain(account: KinAccount, completionHandler: @escaping (([String: Any]?) -> ())) {
-    // Test blockchain URL for account creation
-    let createUrlString = "http://friendbot-testnet.kininfrastructure.com?addr=\(account.publicAddress)"
+func createPlaygroundAccountOnBlockchain(account: KinAccount, completionHandler: @escaping (([String: Any]?) -> ())) {
+    // Playground blockchain URL for account creation
+    let createUrlString = "http://friendbot-playground.kininfrastructure.com?addr=\(account.publicAddress)"
 
     guard let createUrl = URL(string: createUrlString) else { return }
     let request = URLRequest(url: createUrl)
     let task = URLSession.shared.dataTask(with: request) { (data: Data?, response: URLResponse?, error: Error?) in
         if let error = error {
-            print("Account creation on test blockchain failed with error: \(error)")
+            print("Account creation on playground blockchain failed with error: \(error)")
             completionHandler(nil)
             return
         }
         guard let data = data,
               let json = try? JSONSerialization.jsonObject(with: data, options: []),
               let result = json as? [String: Any] else {
-            print("Account creation on test blockchain failed with no parsable JSON")
+            print("Account creation on playground blockchain failed with no parsable JSON")
             completionHandler(nil)
             return
         }
-        print("Account creation on test blockchain was successful with response data: \(result)")
+        print("Account creation on playground blockchain was successful with response data: \(result)")
         completionHandler(result)
     }
 
@@ -164,9 +163,9 @@ func createTestAccountOnBlockchain(account: KinAccount, completionHandler: @esca
 
 Your `viewDidLoad` can now look like this:
 
-```
-// Initialize the Kin client on the test blockchain
-let kinClient: KinClient! = initializeKinClientOnTestNetwork()
+```swift
+// Initialize the Kin client on the playground blockchain
+let kinClient: KinClient! = initializeKinClientOnPlaygroundNetwork()
 
 // The Kin Account we're going to create and use
 var account: KinAccount! = nil
@@ -196,13 +195,13 @@ performed as described above.
 To get an account status, an asynchronous call is performed with `func status(completion: @escaping (AccountStatus?,
 Error?) -> Void)`
 
-```
+```swift
 account.status { (status: AccountStatus?, error: Error?) in
     guard let status = status else { return }
     switch status {
     case .notCreated:
         // The account has just been created locally. It needs to be added to the blockchain
-        // We create that account on the test blockchain
+        // We create that account on the playground blockchain
         ()
     case .created:
         // The account exists on the blockchain - We can send transactions (provided there are enough kins)
@@ -216,7 +215,7 @@ account.status { (status: AccountStatus?, error: Error?) in
 The balance gives you the number of kins available on your account.
 To get the balance, an asynchronous call is performed with `func balance(completion: @escaping BalanceCompletion)`
 
-```
+```swift
 /**
 Get the balance using the method with callback.
 */
@@ -236,13 +235,13 @@ func getBalance(forAccount account: KinAccount, completionHandler: ((Kin?) -> ()
 
 ## Send kins with a transaction
 
-Provided the account has been created and funded on the test blockchain environment, you can now use it to send kins
+Provided the account has been created and funded on the playground blockchain environment, you can now use it to send kins
 to another account. This process happens in two steps:
 - Building the transaction request, which returns a `TransactionEnvelope` object if successful
 - Sending the request, which returns a `TransactionId` if successful
 
 The following snippet generate the transaction request, then send it.
-```
+```swift
 /**
 Sends a transaction to the given account.
 */
@@ -283,7 +282,7 @@ Once an account has been added to the `KinClient`, its information is stored sec
 that same account for instance in a different app, you need to export it to a JSON string, encoded with a passphrase.
  To import it later you just need the JSON and the same passphrase.
 
-```
+```swift
 // Exports the account to a JSON string with the given passphrase. You can later import the account with the
 // same passphrase and the JSON string.
 let json = try! account.export(passphrase: “a-secret-passphrase-here”)
@@ -291,7 +290,7 @@ print("Exported JSON \n\(json)\n")
 ```
 
 The resulting JSON looks like this:
-```
+```json
 {“pkey":"GA5J72WTDFR7E2IJPAOG65V5MP3QDQCVVNWIGXXLSYVTQMY7RZAYV3EM",
 "seed":"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567",
 "salt":"aafca71bc57d1065198b88281425f22c”}

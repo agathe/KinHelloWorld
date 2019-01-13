@@ -13,15 +13,15 @@ class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        // Initialize the Kin client on the test blockchain
-        let kinClient: KinClient! = initializeKinClientOnTestNetwork()
+        // Initialize the Kin client on the playground blockchain
+        let kinClient: KinClient! = initializeKinClientOnPlaygroundNetwork()
 
         // The Kin Account we're going to create and use
         var account: KinAccount! = nil
 
         // This deletes any stored account so that we recreate one
-//        deleteFirstAccount(kinClient: kinClient)
-        
+        deleteFirstAccount(kinClient: kinClient)
+
         // Get any stored existing user account
         if let existingAccount = getFirstAccount(kinClient: kinClient) {
             print("Current account with address \(existingAccount.publicAddress)")
@@ -53,18 +53,18 @@ class ViewController: UIViewController {
             case .notCreated:
                 // The account has just been created locally. It needs to be added to the blockchain
 
-                // We create that account on the test blockchain
-                self.createTestAccountOnBlockchain(account: account) { (result: [String : Any]?) in
+                // We create that account on the playground blockchain
+                self.createPlaygroundAccountOnBlockchain(account: account) { (result: [String : Any]?) in
                     guard result != nil else {
                         print("The account has not been created")
                         return
                     }
                     print("Account was created successfully")
 
-                    // Fund the account, which we can do this way only on the test blockchain.
+                    // Fund the account, which we can do this way only on the playground blockchain.
                     // If you're using the main blockchain, the account will have fund once another account sends
                     // kins to it.
-                    self.fundTestAccount(account: account) { (success) in
+                    self.fundPlaygroundAccount(account: account) { (success) in
                         guard success else {
                             print("Account was not funded")
                             return
@@ -75,11 +75,15 @@ class ViewController: UIViewController {
                         self.printStatus(forAccount: account, completionHandler: nil)
 
                         // Sends some kinds to another account
-                        let toAddress = "GDXTTWKMVNFMEX3HGU7DNVOOXIUP6KM7YANENXILHUCZFHG2IGSK352K"
+                        let toAddress = "GBGOKDBB3PABAGJV233C3LVBIO5HFQUUSML4FTXYCHW2VCEU4QLYL2II"
                         self.sendTransaction(fromAccount: account,
                                 toAddress: toAddress,
-                                kinAmount: 10,
+                                kinAmount: 5,
                                 memo: "Test") { txId in
+                            guard let _ = txId else {
+                                print("Error sending transaction")
+                                return
+                            }
                             print("Kins were sent successfully!!!!!")
                         }
                     }
@@ -96,11 +100,15 @@ class ViewController: UIViewController {
                         return
                     }
                     print("The account is created and can send kins with a balance of \(kin) Kins")
-                    let toAddress = "GDXTTWKMVNFMEX3HGU7DNVOOXIUP6KM7YANENXILHUCZFHG2IGSK352K"
+                    let toAddress = "GBGOKDBB3PABAGJV233C3LVBIO5HFQUUSML4FTXYCHW2VCEU4QLYL2II"
                     self.sendTransaction(fromAccount: account,
                             toAddress: toAddress,
-                            kinAmount: 9.8,
+                            kinAmount: 4.8,
                             memo: "Test") { txId in
+                        guard let _ = txId else {
+                            print("Error sending transaction")
+                            return
+                        }
                         print("Kins were sent successfully!!!!!")
                     }
                 }
@@ -115,14 +123,14 @@ class ViewController: UIViewController {
     }
 
     /**
-    Initializes the Kin Client with the test environment.
+    Initializes the Kin Client with the playground environment.
     */
-    func initializeKinClientOnTestNetwork() -> KinClient? {
-        let url = "http://horizon-testnet.kininfrastructure.com"
+    func initializeKinClientOnPlaygroundNetwork() -> KinClient? {
+        let url = "http://horizon-playground.kininfrastructure.com"
         guard let providerUrl = URL(string: url) else { return nil }
         do {
             let appId = try AppId("test")
-            return KinClient(with: providerUrl, network: .testNet, appId: appId)
+            return KinClient(with: providerUrl, network: .playground, appId: appId)
         } catch let error {
             print("Error \(error)")
         }
@@ -232,28 +240,34 @@ class ViewController: UIViewController {
     }
 
     /**
-    Create the given stored account on the test blockchain.
+    Create the given stored account on the playground blockchain.
     */
-    func createTestAccountOnBlockchain(account: KinAccount, completionHandler: @escaping (([String: Any]?) -> ())) {
-        // Test blockchain URL for account creation
-        let createUrlString = "http://friendbot-testnet.kininfrastructure.com?addr=\(account.publicAddress)"
-        
+    func createPlaygroundAccountOnBlockchain(account: KinAccount, completionHandler: @escaping (([String: Any]?) -> ())) {
+        // Playground blockchain URL for account creation
+        let createUrlString = "http://friendbot-playground.kininfrastructure.com?addr=\(account.publicAddress)"
+
         guard let createUrl = URL(string: createUrlString) else { return }
         let request = URLRequest(url: createUrl)
         let task = URLSession.shared.dataTask(with: request) { (data: Data?, response: URLResponse?, error: Error?) in
             if let error = error {
-                print("Account creation on test blockchain failed with error: \(error)")
+                print("Account creation on playground blockchain failed with error: \(error)")
                 completionHandler(nil)
                 return
             }
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data, options: []),
                   let result = json as? [String: Any] else {
-                print("Account creation on test blockchain failed with no parsable JSON")
+                print("Account creation on playground blockchain failed with no parsable JSON")
                 completionHandler(nil)
                 return
             }
-            print("Account creation on test blockchain was successful with response data: \(result)")
+            // check if there's a bad status
+            guard result["status"] == nil else {
+                print("Error status \(result)")
+                completionHandler(nil)
+                return
+            }
+            print("Account creation on playground blockchain was successful with response data: \(result)")
             completionHandler(result)
         }
 
@@ -261,9 +275,9 @@ class ViewController: UIViewController {
     }
 
     /**
-    Fund the account on the test blockchain.
+    Fund the account on the playground blockchain.
     */
-    func fundTestAccount(account: KinAccount, completionHandler: @escaping ((Bool) -> ())) {
+    func fundPlaygroundAccount(account: KinAccount, completionHandler: @escaping ((Bool) -> ())) {
         // The funding URL - it will fund the account with 10000 kins (
         let fundUrlString = "http://faucet-playground.kininfrastructure.com/fund?account=\(account.publicAddress)&amount=6000"
         
@@ -274,18 +288,18 @@ class ViewController: UIViewController {
         let request = URLRequest(url: fundUrl)
         let task = URLSession.shared.dataTask(with: request) { (data: Data?, response: URLResponse?, error: Error?) in
             if let error = error {
-                print("Test account funding failed with error \(error)")
+                print("Playground account funding failed with error \(error)")
                 completionHandler(false)
                 return
             }
             guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data, options: []),
                   let result = json as? [String: Any] else {
-                print("Test account funding failed with no parsable JSON")
+                print("Playground account funding failed with no parsable JSON")
                 completionHandler(false)
                 return
             }
-            print("Test account funding returned response data: \(result)")
+            print("Playground account funding returned response data: \(result)")
 
             // Temporary fix: getting the balance to verify that we have kins on the account
             self.getBalance(forAccount: account, completionHandler: { (kin) in
