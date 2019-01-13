@@ -20,7 +20,7 @@ class ViewController: UIViewController {
         var account: KinAccount! = nil
 
         // This deletes any stored account so that we recreate one
-        deleteFirstAccount(kinClient: kinClient)
+//        deleteFirstAccount(kinClient: kinClient)
         
         // Get any stored existing user account
         if let existingAccount = getFirstAccount(kinClient: kinClient) {
