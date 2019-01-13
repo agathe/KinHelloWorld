@@ -10,115 +10,161 @@ import KinSDK
 
 class ViewController: UIViewController {
 
-    var kinClient: KinClient!
-    var account: KinAccount!
-    let linkBag = LinkBag()
-    var balanceWatch: BalanceWatch!
-    
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        // Initialize the Kin client
-        initializeKinOnTestNetwork()
-        
-        deleteFirstAccount()
+        // Initialize the Kin client on the test blockchain
+        let kinClient: KinClient! = initializeKinClientOnTestNetwork()
+
+        // The Kin Account we're going to create and use
+        var account: KinAccount! = nil
+
+        // This deletes any stored account so that we recreate one
+        deleteFirstAccount(kinClient: kinClient)
         
         // Get any stored existing user account
-        if let existingAccount = getAccount() {
+        if let existingAccount = getFirstAccount(kinClient: kinClient) {
             print("Current account with address \(existingAccount.publicAddress)")
             account = existingAccount
         }
         // or else create an account with the client
-        else if let newAccount = createLocalAccount() {
+        else if let newAccount = createLocalAccount(kinClient: kinClient) {
             print("Created account with address \(newAccount.publicAddress)")
             account = newAccount
         }
-        
-        
-        let json = try! account.export(passphrase: "bla")
-        print(json)
-        
+
+        // Watch for the creation of the account
         watchCreation(forAccount: account)
-        
+
+        // Watch for changes in the balance of the account
+        watchBalance(forAccount: account)
+
+        // Print the current status of the account
         printStatus(forAccount: account, completionHandler: nil)
-//        printBalance(forAccount: account)
-        
+
+        // We use here the asynchronous version of the methods to get the status, and depending on the status (whether
+        // the account has been created on the blockchain or not) we create it on the blockchain, fund it, and
+        // send a transaction, or just print the balance and send a transaction.
+
+        // Get the status of the account
         account.status { (status: AccountStatus?, error: Error?) in
             guard let status = status else { return }
-            if status == .notCreated {
-                self.createTestAccountOnBlockchain(account: self.account) { (result: [String : Any]?) in
-                    print("Account was created ")
-                    self.printStatus(forAccount: self.account) { (status) in
-                        self.fundTestAccount(account: self.account, completionHandler: { (success) in
-                            guard success else {
-                                print("Cannot send kins")
-                                return
-                            }
-                            print("Account was funded - sending kins")
-                            self.printStatus(forAccount: self.account, completionHandler: nil)
-                            let toAddress = "GDXTTWKMVNFMEX3HGU7DNVOOXIUP6KM7YANENXILHUCZFHG2IGSK352K"
-                            self.sendTransaction(fromAccount: self.account,
-                                                 toAddress: toAddress,
-                                                 kinAmount: 10,
-                                                 memo: "Test") { txId in
-                                                    print("DONE!!!!!")
-                            }
+            switch status {
+            case .notCreated:
+                // The account has just been created locally. It needs to be added to the blockchain
 
-                        })
+                // We create that account on the test blockchain
+                self.createTestAccountOnBlockchain(account: account) { (result: [String : Any]?) in
+                    guard result != nil else {
+                        print("The account has not been created")
+                        return
+                    }
+                    print("Account was created successfully")
+
+                    // Fund the account, which we can do this way only on the test blockchain.
+                    // If you're using the main blockchain, the account will have fund once another account sends
+                    // kins to it.
+                    self.fundTestAccount(account: account) { (success) in
+                        guard success else {
+                            print("Account was not funded")
+                            return
+                        }
+                        print("Account was funded - now sending kins to another account")
+
+                        // Print the account's status again
+                        self.printStatus(forAccount: account, completionHandler: nil)
+
+                        // Sends some kinds to another account
+                        let toAddress = "GDXTTWKMVNFMEX3HGU7DNVOOXIUP6KM7YANENXILHUCZFHG2IGSK352K"
+                        self.sendTransaction(fromAccount: account,
+                                toAddress: toAddress,
+                                kinAmount: 10,
+                                memo: "Test") { txId in
+                            print("Kins were sent successfully!!!!!")
+                        }
                     }
                 }
-            } else {
-                self.printBalance(forAccount: self.account)
-//                self.fundTestAccount(account: self.account, completionHandler: { (info) in
-//                    self.printBalance(forAccount: self.account)
-//                })
-                
-                print("The account is activated and can send funds")
-                let toAddress = "GDXTTWKMVNFMEX3HGU7DNVOOXIUP6KM7YANENXILHUCZFHG2IGSK352K"
-                self.sendTransaction(fromAccount: self.account,
-                                     toAddress: toAddress,
-                                     kinAmount: 9.8,
-                                     memo: "Test") { txId in
-                                        print("DONE!!!!!")
+
+            case .created:
+                // The account exists on the blockchain - We can send transactions (provided there are enough kins)
+
+                // Get the balance
+                self.getBalance(forAccount: account) { kin in
+                    guard let kin = kin,
+                          kin > 0.0 else {
+                        print("No kins in this account")
+                        return
+                    }
+                    print("The account is created and can send kins with a balance of \(kin) Kins")
+                    let toAddress = "GDXTTWKMVNFMEX3HGU7DNVOOXIUP6KM7YANENXILHUCZFHG2IGSK352K"
+                    self.sendTransaction(fromAccount: account,
+                            toAddress: toAddress,
+                            kinAmount: 9.8,
+                            memo: "Test") { txId in
+                        print("Kins were sent successfully!!!!!")
+                    }
                 }
             }
         }
+
+        // Exports the account to a JSON string with the given passphrase. You can later import the account with the
+        // same passphrase and the JSON string.
+        let json = try! account.export(passphrase: "a-secret-passphrase-here")
+        print("Exported JSON \n\(json)\n")
+
     }
 
-    func initializeKinOnTestNetwork() {
-        guard let providerUrl = URL(string: "http://horizon-testnet.kininfrastructure.com") else { return }
+    /**
+    Initializes the Kin Client with the test environment.
+    */
+    func initializeKinClientOnTestNetwork() -> KinClient? {
+        let url = "http://horizon-testnet.kininfrastructure.com"
+        guard let providerUrl = URL(string: url) else { return nil }
         do {
             let appId = try AppId("test")
-            kinClient = KinClient(with: providerUrl, network: .testNet, appId: appId)
+            return KinClient(with: providerUrl, network: .testNet, appId: appId)
         } catch let error {
             print("Error \(error)")
         }
+        return nil
     }
-    
-    func getAccount() -> KinAccount? {
+
+    /**
+    Returns the first account stored on the client. The account status will tell whether the account also exists
+    on the blockchain or not.
+    */
+    func getFirstAccount(kinClient: KinClient) -> KinAccount? {
         return kinClient.accounts.first
     }
-    
-    func createLocalAccount() -> KinAccount? {
+
+    /**
+    Create a local stored account (does not created it on the blockchain)
+    */
+    func createLocalAccount(kinClient: KinClient) -> KinAccount? {
         do {
             let account = try kinClient.addAccount()
             return account
         } catch let error {
-            print("Error adding an account \(error)")
+            print("Error creating an account \(error)")
         }
         return nil
     }
-    
-    func deleteFirstAccount() {
+
+    /**
+    Delete the first stored account of the client.
+    */
+    func deleteFirstAccount(kinClient: KinClient) {
         do {
             try kinClient.deleteAccount(at: 0)
-            print("Account delete!")
+            print("First stored account deleted!")
         } catch let error {
             print("Could not delete account \(error)")
         }
-
     }
-    
+
+    /**
+    Get the balance using promises.
+    */
     func printBalance(forAccount account: KinAccount) {
         account.balance()
             .then { (balance: Kin) in
@@ -128,30 +174,25 @@ class ViewController: UIViewController {
                 print("1) Got an error with getting the balance \(error)")
             }
     }
-    
-    func printBalance2(forAccount account: KinAccount, completionHandler: ((Kin?) -> ())?) {
+
+    /**
+    Get the balance using the method with callback.
+    */
+    func getBalance(forAccount account: KinAccount, completionHandler: ((Kin?) -> ())?) {
         account.balance { (balance: Kin?, error: Error?) in
-            if let error = error {
-                print("2) Error getting the balance \(error)")
-                if let completionHandler = completionHandler {
-                    completionHandler(nil)
-                }
+            if error != nil || balance == nil {
+                print("Error getting the balance")
+                if let error = error { print("with error: \(error)") }
+                completionHandler?(nil)
                 return
             }
-            guard let balance = balance else {
-                print("2) Error, no balance")
-                if let completionHandler = completionHandler {
-                    completionHandler(nil)
-                }
-                return
-            }
-            if let completionHandler = completionHandler {
-                completionHandler(balance)
-            }
-            print("2) Balance for account \(balance)")
+            completionHandler?(balance!)
         }
     }
-    
+
+    /**
+    Watch for the creation of the account. This simply prints a message.
+    */
     func watchCreation(forAccount account: KinAccount) {
         do {
             let watch = try account.watchCreation()
@@ -162,50 +203,68 @@ class ViewController: UIViewController {
             print("Error watching account creation \(error)")
         }
     }
-    
+
+    /**
+    Watch the balance. This simply prints a message when the balance has changed.
+    */
+    func watchBalance(forAccount account: KinAccount) {
+        let watch = try! account.watchBalance(nil)
+        watch.emitter.on { (balance: Kin) in
+            print("The account's balance has changed: \(balance)")
+        }
+    }
+
+    /**
+    Get the status of the account using the callback method.
+    */
     func printStatus(forAccount account: KinAccount,
                      completionHandler: ((AccountStatus?) -> ())?) {
         account.status { (status: AccountStatus?, error: Error?) in
-            if let error = error {
-                print("Error getting status \(error)")
-                if let completionHandler = completionHandler {
-                    completionHandler(nil)
-                }
+            if error != nil || status == nil {
+                print("Error getting status")
+                if let error = error { print ("with error: \(error)") }
+                completionHandler?(nil)
                 return
             }
-            guard let status = status else { return }
-            print("Status \(status)")
-            if let completionHandler = completionHandler {
-                completionHandler(status)
-            }
+            print("Account's status: \(status!)")
+            completionHandler?(status!)
         }
     }
-    
+
+    /**
+    Create the given stored account on the test blockchain.
+    */
     func createTestAccountOnBlockchain(account: KinAccount, completionHandler: @escaping (([String: Any]?) -> ())) {
+        // Test blockchain URL for account creation
         let createUrlString = "http://friendbot-testnet.kininfrastructure.com?addr=\(account.publicAddress)"
         
         guard let createUrl = URL(string: createUrlString) else { return }
         let request = URLRequest(url: createUrl)
         let task = URLSession.shared.dataTask(with: request) { (data: Data?, response: URLResponse?, error: Error?) in
             if let error = error {
-                print("Error \(error)")
+                print("Account creation on test blockchain failed with error: \(error)")
                 completionHandler(nil)
                 return
             }
             guard let data = data,
-            let json = try? JSONSerialization.jsonObject(with: data, options: []),
-                let result = json as? [String: Any] else {
-                    print("Unable to parse json")
-                    completionHandler(nil)
-                    return
+                  let json = try? JSONSerialization.jsonObject(with: data, options: []),
+                  let result = json as? [String: Any] else {
+                print("Account creation on test blockchain failed with no parsable JSON")
+                completionHandler(nil)
+                return
             }
-            print("Result of test account creation \(result)")
+            print("Account creation on test blockchain was successful with response data: \(result)")
             completionHandler(result)
         }
+
         task.resume()
     }
-    
+
+    /**
+    Fund the account on the test blockchain.
+    */
     func fundTestAccount(account: KinAccount, completionHandler: @escaping ((Bool) -> ())) {
+        // The funding URL - it will fund the account with 10000 kins (
         let fundUrlString = "http://faucet-playground.kininfrastructure.com/fund?account=\(account.publicAddress)&amount=6000"
         
         guard let fundUrl = URL(string: fundUrlString) else {
@@ -215,24 +274,31 @@ class ViewController: UIViewController {
         let request = URLRequest(url: fundUrl)
         let task = URLSession.shared.dataTask(with: request) { (data: Data?, response: URLResponse?, error: Error?) in
             if let error = error {
-                print("Error Funding the account \(error)")
+                print("Test account funding failed with error \(error)")
                 completionHandler(false)
                 return
             }
             guard let data = data,
-                let json = try? JSONSerialization.jsonObject(with: data, options: []),
-                let result = json as? [String: Any] else {
-                    print("Unable to parse json")
+                  let json = try? JSONSerialization.jsonObject(with: data, options: []),
+                  let result = json as? [String: Any] else {
+                print("Test account funding failed with no parsable JSON")
+                completionHandler(false)
+                return
+            }
+            print("Test account funding returned response data: \(result)")
+
+            // Temporary fix: getting the balance to verify that we have kins on the account
+            self.getBalance(forAccount: account, completionHandler: { (kin) in
+                guard let kin = kin else {
                     completionHandler(false)
                     return
-            }
-            print("Fund request response \(result)")
-            
-            self.printBalance2(forAccount: account, completionHandler: { (kin) in
-                completionHandler(true)
+                }
+                completionHandler(kin > 0.0)
             })
-            
-//            guard let success = result["sucess"] as? Int,
+
+            // At the moment, we cannot successfully verify the response data to determine whether the funding was
+            // successful or not.
+//            guard let success = result["success"] as? Int,
 //                success == 0 else {
 //                    print("Error Funding account \(result["error"])")
 //                    completionHandler(false)
@@ -240,40 +306,40 @@ class ViewController: UIViewController {
 //            }
 //            completionHandler(true)
         }
+
         task.resume()
     }
     
-    func sendTransaction(fromAccount account: KinAccount, toAddress address: String,
+
+    /**
+    Sends a transaction to the given account.
+    */
+    func sendTransaction(fromAccount account: KinAccount,
+                         toAddress address: String,
                          kinAmount kin: Kin,
                          memo: String?,
                          completionHandler: ((String?) -> ())?) {
+        // Get a transaction envelope object
         account.generateTransaction(to: address, kin: kin, memo: memo) { (envelope, error) in
-            if let error = error {
-                print("Could not generate the transaction \(error)")
+            if error != nil || envelope == nil {
+                print("Could not generate the transaction")
+                if let error = error { print("with error: \(error)")}
                 completionHandler?(nil)
                 return
             }
-            guard let envelope = envelope else {
-                completionHandler?(nil)
-                return
-            }
-            account.sendTransaction(envelope){ (txId, error) in
-                if let error = error {
-                    print("Error send transaction \(error)")
+            // Sends the transaction
+            account.sendTransaction(envelope!){ (txId, error) in
+                if error != nil || txId == nil {
+                    print("Error send transaction")
+                    if let error = error { print("with error: \(error)") }
                     completionHandler?(nil)
                     return
                 }
-                guard let txId = txId else {
-                    print("Error no transaction id")
-                    completionHandler?(nil)
-                    return
-                }
-                print("Sent transaction \(txId) OK!")
-                completionHandler?(txId)
+                print("Transaction was sent successfully for \(kin) Kins - id: \(txId!)")
+                completionHandler?(txId!)
             }
         }
-        
     }
-    
+
 }
 

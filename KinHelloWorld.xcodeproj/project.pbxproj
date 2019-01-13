@@ -13,6 +13,7 @@
 		318874AC21E7B0E700A023C6 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 318874AA21E7B0E700A023C6 /* Main.storyboard */; };
 		318874AE21E7B0E900A023C6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 318874AD21E7B0E900A023C6 /* Assets.xcassets */; };
 		318874B121E7B0E900A023C6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 318874AF21E7B0E900A023C6 /* LaunchScreen.storyboard */; };
+		AB5F6496F6DC0D0F3D43AB07 /* hi-kin-ios.md in Sources */ = {isa = PBXBuildFile; fileRef = AB5F68A51265A55827A394A6 /* hi-kin-ios.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,9 +25,9 @@
 		318874AD21E7B0E900A023C6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		318874B021E7B0E900A023C6 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		318874B221E7B0E900A023C6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		318874B821E7BAF000A023C6 /* KinPlayground.playground */ = {isa = PBXFileReference; lastKnownFileType = file.playground; path = KinPlayground.playground; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.swift; };
 		602A0F3EDC22F746A4462C6F /* Pods-KinHelloWorld.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-KinHelloWorld.release.xcconfig"; path = "Pods/Target Support Files/Pods-KinHelloWorld/Pods-KinHelloWorld.release.xcconfig"; sourceTree = "<group>"; };
 		894D32C8A0E9E62B94481BA6 /* Pods-KinHelloWorld.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-KinHelloWorld.debug.xcconfig"; path = "Pods/Target Support Files/Pods-KinHelloWorld/Pods-KinHelloWorld.debug.xcconfig"; sourceTree = "<group>"; };
+		AB5F68A51265A55827A394A6 /* hi-kin-ios.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = "hi-kin-ios.md"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -48,6 +49,7 @@
 				318874A421E7B0E700A023C6 /* Products */,
 				871405799ECC078A7EE8BFEE /* Pods */,
 				694D16B764F2321B83A04934 /* Frameworks */,
+				AB5F68A51265A55827A394A6 /* hi-kin-ios.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -62,7 +64,6 @@
 		318874A521E7B0E700A023C6 /* KinHelloWorld */ = {
 			isa = PBXGroup;
 			children = (
-				318874B821E7BAF000A023C6 /* KinPlayground.playground */,
 				318874A621E7B0E700A023C6 /* AppDelegate.swift */,
 				318874A821E7B0E700A023C6 /* ViewController.swift */,
 				318874AA21E7B0E700A023C6 /* Main.storyboard */,
@@ -216,6 +217,7 @@
 			files = (
 				318874A921E7B0E700A023C6 /* ViewController.swift in Sources */,
 				318874A721E7B0E700A023C6 /* AppDelegate.swift in Sources */,
+				AB5F6496F6DC0D0F3D43AB07 /* hi-kin-ios.md in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

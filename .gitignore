@@ -1,2 +1,6 @@
 DerivedData
+Pods
+.idea
+*.xcodeproj/xcuserdata/
+*.xcworkspace
 
