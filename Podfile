@@ -6,6 +6,6 @@ target 'KinHelloWorld' do
   use_frameworks!
 
   # Pods for KinHelloWorld
-  pod 'KinSDK', '~> 0.8.0’
-
+  #pod 'KinSDK', '~> 0.8.0’
+  pod 'KinSDK', :git => 'https://github.com/kinecosystem/kin-sdk-ios.git'
 end
