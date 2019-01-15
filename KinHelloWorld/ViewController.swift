@@ -20,7 +20,7 @@ class ViewController: UIViewController {
         var account: KinAccount! = nil
 
         // This deletes any stored account so that we recreate one
-//        deleteFirstAccount(kinClient: kinClient)
+        deleteFirstAccount(kinClient: kinClient)
 
         // Get any stored existing user account
         if let existingAccount = getFirstAccount(kinClient: kinClient) {
@@ -42,14 +42,28 @@ class ViewController: UIViewController {
         // Print the current status of the account
         printStatus(forAccount: account, completionHandler: nil)
 
+        // Get the minimum fee required to send a transaction
+        kinClient.minFee()
+                .then { (fee) in
+                    print("Minimum fee \(fee)")
+                }
+                .error { (error: Error) in
+                    print("Error getting the minimum fee \(error)" )
+                }
+        
+        
         // We use here the asynchronous version of the methods to get the status, and depending on the status (whether
         // the account has been created on the blockchain or not) we create it on the blockchain, fund it, and
         // send a transaction, or just print the balance and send a transaction.
 
         // Get the status of the account
         account.status { (status: AccountStatus?, error: Error?) in
-            guard let status = status else { return }
+            guard let status = status else {
+                return
+            }
+
             switch status {
+
             case .notCreated:
                 // The account has just been created locally. It needs to be added to the blockchain
 
@@ -61,15 +75,14 @@ class ViewController: UIViewController {
                     }
                     print("Account was created successfully")
 
-                    // Fund the account, which we can do this way only on the playground blockchain.
-                    // If you're using the main blockchain, the account will have fund once another account sends
-                    // kins to it.
-                    self.fundPlaygroundAccount(account: account) { (success) in
-                        guard success else {
-                            print("Account was not funded")
+                    // Get the balance on the account
+                    self.getBalance(forAccount: account) { kin in
+                        guard let kin = kin,
+                              kin > 0.0 else {
+                            print("No Kin available in this account")
                             return
                         }
-                        print("Account was funded - now sending kins to another account")
+                        print("The account has \(kin) Kin")
 
                         // Print the account's status again
                         self.printStatus(forAccount: account, completionHandler: nil)
@@ -79,12 +92,22 @@ class ViewController: UIViewController {
                         self.sendTransaction(fromAccount: account,
                                 toAddress: toAddress,
                                 kinAmount: 5,
-                                memo: "Test") { txId in
+                                memo: "Testing transaction",
+                                fee: 1) { txId in
                             guard let _ = txId else {
                                 print("Error sending transaction")
                                 return
                             }
                             print("Kins were sent successfully!!!!!")
+
+                            // Get the balance after the transaction
+                            self.getBalance(forAccount: account) { kin in
+                                guard let kin = kin else {
+                                    print("Error getting the balance")
+                                    return
+                                }
+                                print("Now the balance is \(kin) Kin")
+                            }
                         }
                     }
                 }
@@ -103,13 +126,21 @@ class ViewController: UIViewController {
                     let toAddress = "GBGOKDBB3PABAGJV233C3LVBIO5HFQUUSML4FTXYCHW2VCEU4QLYL2II"
                     self.sendTransaction(fromAccount: account,
                             toAddress: toAddress,
-                            kinAmount: 4.8,
-                            memo: "Test") { txId in
+                            kinAmount: 4,
+                            memo: "Test",
+                            fee: 1) { txId in
                         guard let _ = txId else {
                             print("Error sending transaction")
                             return
                         }
                         print("Kins were sent successfully!!!!!")
+                        self.getBalance(forAccount: account) { kin in
+                            guard let kin = kin else {
+                                print("Error getting the balance")
+                                return
+                            }
+                            print("Now the balance is \(kin) Kin")
+                        }
                     }
                 }
             }
@@ -126,11 +157,11 @@ class ViewController: UIViewController {
     Initializes the Kin Client with the playground environment.
     */
     func initializeKinClientOnPlaygroundNetwork() -> KinClient? {
-        let url = "http://horizon-playground.kininfrastructure.com"
+        let url = "http://horizon-testnet.kininfrastructure.com"
         guard let providerUrl = URL(string: url) else { return nil }
         do {
             let appId = try AppId("test")
-            return KinClient(with: providerUrl, network: .playground, appId: appId)
+            return KinClient(with: providerUrl, network: .testNet, appId: appId)
         } catch let error {
             print("Error \(error)")
         }
@@ -171,19 +202,6 @@ class ViewController: UIViewController {
     }
 
     /**
-    Get the balance using promises.
-    */
-    func printBalance(forAccount account: KinAccount) {
-        account.balance()
-            .then { (balance: Kin) in
-                print("1) balance is \(balance)")
-            }
-            .error { (error:Error) in
-                print("1) Got an error with getting the balance \(error)")
-            }
-    }
-
-    /**
     Get the balance using the method with callback.
     */
     func getBalance(forAccount account: KinAccount, completionHandler: ((Kin?) -> ())?) {
@@ -205,7 +223,7 @@ class ViewController: UIViewController {
         do {
             let watch = try account.watchCreation()
             watch.then { (_) in
-                print("!!!!!!!!!!!!!!Account was created (watch)")
+                print("Account creation watcher update: was created (watch)")
             }
         } catch let error {
             print("Error watching account creation \(error)")
@@ -244,7 +262,7 @@ class ViewController: UIViewController {
     */
     func createPlaygroundAccountOnBlockchain(account: KinAccount, completionHandler: @escaping (([String: Any]?) -> ())) {
         // Playground blockchain URL for account creation
-        let createUrlString = "http://friendbot-playground.kininfrastructure.com?addr=\(account.publicAddress)"
+        let createUrlString = "http://friendbot-testnet.kininfrastructure.com?addr=\(account.publicAddress)"
 
         guard let createUrl = URL(string: createUrlString) else { return }
         let request = URLRequest(url: createUrl)
@@ -275,66 +293,16 @@ class ViewController: UIViewController {
     }
 
     /**
-    Fund the account on the playground blockchain.
-    */
-    func fundPlaygroundAccount(account: KinAccount, completionHandler: @escaping ((Bool) -> ())) {
-        // The funding URL - it will fund the account with 10000 kins (
-        let fundUrlString = "http://faucet-playground.kininfrastructure.com/fund?account=\(account.publicAddress)&amount=6000"
-        
-        guard let fundUrl = URL(string: fundUrlString) else {
-            completionHandler(false)
-            return
-        }
-        let request = URLRequest(url: fundUrl)
-        let task = URLSession.shared.dataTask(with: request) { (data: Data?, response: URLResponse?, error: Error?) in
-            if let error = error {
-                print("Playground account funding failed with error \(error)")
-                completionHandler(false)
-                return
-            }
-            guard let data = data,
-                  let json = try? JSONSerialization.jsonObject(with: data, options: []),
-                  let result = json as? [String: Any] else {
-                print("Playground account funding failed with no parsable JSON")
-                completionHandler(false)
-                return
-            }
-            print("Playground account funding returned response data: \(result)")
-
-            // Temporary fix: getting the balance to verify that we have kins on the account
-            self.getBalance(forAccount: account, completionHandler: { (kin) in
-                guard let kin = kin else {
-                    completionHandler(false)
-                    return
-                }
-                completionHandler(kin > 0.0)
-            })
-
-            // At the moment, we cannot successfully verify the response data to determine whether the funding was
-            // successful or not.
-//            guard let success = result["success"] as? Int,
-//                success == 0 else {
-//                    print("Error Funding account \(result["error"])")
-//                    completionHandler(false)
-//                    return
-//            }
-//            completionHandler(true)
-        }
-
-        task.resume()
-    }
-    
-
-    /**
     Sends a transaction to the given account.
     */
     func sendTransaction(fromAccount account: KinAccount,
                          toAddress address: String,
                          kinAmount kin: Kin,
                          memo: String?,
+                         fee: Stroop,
                          completionHandler: ((String?) -> ())?) {
         // Get a transaction envelope object
-        account.generateTransaction(to: address, kin: kin, memo: memo) { (envelope, error) in
+        account.generateTransaction(to: address, kin: kin, memo: memo, fee: fee) { (envelope, error) in
             if error != nil || envelope == nil {
                 print("Could not generate the transaction")
                 if let error = error { print("with error: \(error)")}
