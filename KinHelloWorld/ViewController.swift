@@ -134,6 +134,7 @@ class ViewController: UIViewController {
                             return
                         }
                         print("Kins were sent successfully!!!!!")
+
                         self.getBalance(forAccount: account) { kin in
                             guard let kin = kin else {
                                 print("Error getting the balance")
@@ -150,7 +151,6 @@ class ViewController: UIViewController {
         // same passphrase and the JSON string.
         let json = try! account.export(passphrase: "a-secret-passphrase-here")
         print("Exported JSON \n\(json)\n")
-
     }
 
     /**
@@ -159,10 +159,12 @@ class ViewController: UIViewController {
     func initializeKinClientOnPlaygroundNetwork() -> KinClient? {
         let url = "http://horizon-testnet.kininfrastructure.com"
         guard let providerUrl = URL(string: url) else { return nil }
+
         do {
             let appId = try AppId("test")
             return KinClient(with: providerUrl, network: .testNet, appId: appId)
-        } catch let error {
+        }
+        catch let error {
             print("Error \(error)")
         }
         return nil
@@ -183,7 +185,8 @@ class ViewController: UIViewController {
         do {
             let account = try kinClient.addAccount()
             return account
-        } catch let error {
+        }
+        catch let error {
             print("Error creating an account \(error)")
         }
         return nil
@@ -196,7 +199,8 @@ class ViewController: UIViewController {
         do {
             try kinClient.deleteAccount(at: 0)
             print("First stored account deleted!")
-        } catch let error {
+        }
+        catch let error {
             print("Could not delete account \(error)")
         }
     }
@@ -225,7 +229,8 @@ class ViewController: UIViewController {
             watch.then { (_) in
                 print("Account creation watcher update: was created (watch)")
             }
-        } catch let error {
+        }
+        catch let error {
             print("Error watching account creation \(error)")
         }
     }
@@ -258,13 +263,15 @@ class ViewController: UIViewController {
     }
 
     /**
-    Create the given stored account on the playground blockchain.
+    Create the given stored account on the playground blockchain. When on the Playground blockchain, the account
+    is funded with 10000 Kins automatically.
     */
     func createPlaygroundAccountOnBlockchain(account: KinAccount, completionHandler: @escaping (([String: Any]?) -> ())) {
         // Playground blockchain URL for account creation
         let createUrlString = "http://friendbot-testnet.kininfrastructure.com?addr=\(account.publicAddress)"
 
         guard let createUrl = URL(string: createUrlString) else { return }
+
         let request = URLRequest(url: createUrl)
         let task = URLSession.shared.dataTask(with: request) { (data: Data?, response: URLResponse?, error: Error?) in
             if let error = error {
