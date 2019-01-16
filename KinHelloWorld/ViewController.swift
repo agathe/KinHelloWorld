@@ -93,8 +93,7 @@ class ViewController: UIViewController {
                                 toAddress: toAddress,
                                 kinAmount: 5,
                                 memo: "Testing transaction",
-                                fee: 1,
-                                whitelist: false) { txId in
+                                fee: 1) { txId in
                             guard let _ = txId else {
                                 print("Error sending transaction")
                                 return
@@ -125,12 +124,11 @@ class ViewController: UIViewController {
                     }
                     print("The account is created and can send kins with a balance of \(kin) Kins")
                     let toAddress = "GBGOKDBB3PABAGJV233C3LVBIO5HFQUUSML4FTXYCHW2VCEU4QLYL2II"
-                    self.sendTransaction(fromAccount: account,
+                    self.sendWhitelistTransaction(fromAccount: account,
                             toAddress: toAddress,
                             kinAmount: 4,
                             memo: "Test",
-                            fee: 1,
-                            whitelist: false) { txId in
+                            fee: 1) { txId in
                         guard let _ = txId else {
                             print("Error sending whitelist transaction")
                             return
@@ -310,7 +308,6 @@ class ViewController: UIViewController {
                          kinAmount kin: Kin,
                          memo: String?,
                          fee: Stroop,
-                         whitelist: Bool,
                          completionHandler: ((String?) -> ())?) {
         // Get a transaction envelope object
         account.generateTransaction(to: address, kin: kin, memo: memo, fee: fee) { (envelope, error) in
@@ -321,44 +318,69 @@ class ViewController: UIViewController {
                 return
             }
 
-            if whitelist {
-                let networkId = Network.testNet.id
-                let whitelistEnvelope = WhitelistEnvelope(transactionEnvelope: envelope!, networkId: networkId)
-
-                self.signWhitelistTransaction(envelope: whitelistEnvelope) { (signedEnvelope, error) in
-                    if error != nil || signedEnvelope == nil {
-                        print("Error whitelisting the envelope")
-                        if let error = error { print("with error: \(error)") }
-                        completionHandler?(nil)
-                        return
+            // Sends the transaction
+            account.sendTransaction(envelope!) { (txId, error) in
+                if error != nil || txId == nil {
+                    print("Error send transaction")
+                    if let error = error {
+                        print("with error: \(error)")
                     }
-                    // send the whitelist transaction
-                    account.sendTransaction(signedEnvelope!){ (txId, error) in
-                        if error != nil || txId == nil {
-                            print("Error send whitelist transaction")
-                            if let error = error { print("with error: \(error)") }
-                            completionHandler?(nil)
-                            return
-                        }
-                        print("Whitelist transaction was sent successfully for \(kin) Kins - id: \(txId!)")
-                        completionHandler?(txId!)
-                    }
-
+                    completionHandler?(nil)
+                    return
                 }
-            } else {
-                // Sends the transaction
-                account.sendTransaction(envelope!) { (txId, error) in
+                print("Transaction was sent successfully for \(kin) Kins - id: \(txId!)")
+                completionHandler?(txId!)
+            }
+        }
+    }
+
+    /**
+    Sends a transaction to the given account.
+    */
+    func sendWhitelistTransaction(fromAccount account: KinAccount,
+                                  toAddress address: String,
+                                  kinAmount kin: Kin,
+                                  memo: String?,
+                                  fee: Stroop,
+                                  completionHandler: ((String?) -> ())?) {
+        // Get a transaction envelope object
+        account.generateTransaction(to: address, kin: kin, memo: memo, fee: fee) { (envelope, error) in
+            if error != nil || envelope == nil {
+                print("Could not generate the transaction")
+                if let error = error {
+                    print("with error: \(error)")
+                }
+                completionHandler?(nil)
+                return
+            }
+
+            let networkId = Network.testNet.id
+            let whitelistEnvelope = WhitelistEnvelope(transactionEnvelope: envelope!, networkId: networkId)
+
+            self.signWhitelistTransaction(whitelistServiceUrl: "WHITELIST_SERVICE_URL",
+                    envelope: whitelistEnvelope) { (signedEnvelope, error) in
+                if error != nil || signedEnvelope == nil {
+                    print("Error whitelisting the envelope")
+                    if let error = error {
+                        print("with error: \(error)")
+                    }
+                    completionHandler?(nil)
+                    return
+                }
+                // send the whitelist transaction
+                account.sendTransaction(signedEnvelope!) { (txId, error) in
                     if error != nil || txId == nil {
-                        print("Error send transaction")
+                        print("Error send whitelist transaction")
                         if let error = error {
                             print("with error: \(error)")
                         }
                         completionHandler?(nil)
                         return
                     }
-                    print("Transaction was sent successfully for \(kin) Kins - id: \(txId!)")
+                    print("Whitelist transaction was sent successfully for \(kin) Kins - id: \(txId!)")
                     completionHandler?(txId!)
                 }
+
             }
         }
     }
@@ -366,9 +388,10 @@ class ViewController: UIViewController {
     /**
     Sign the given transaction envelope so that the transaction can be submitted with the fee waived
     */
-    func signWhitelistTransaction(envelope: WhitelistEnvelope,
+    func signWhitelistTransaction(whitelistServiceUrl: String,
+                                  envelope: WhitelistEnvelope,
                                   completionHandler: @escaping ((TransactionEnvelope?, Error?) -> ())) {
-        let whitelistingUrl = URL(string: "")! // WHITELIST SERVICE
+        let whitelistingUrl = URL(string: whitelistServiceUrl)!
 
         var request = URLRequest(url: whitelistingUrl)
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
