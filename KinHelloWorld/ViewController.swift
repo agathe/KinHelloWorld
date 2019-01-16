@@ -369,7 +369,6 @@ class ViewController: UIViewController {
     func signWhitelistTransaction(envelope: WhitelistEnvelope,
                                   completionHandler: @escaping ((TransactionEnvelope?, Error?) -> ())) {
         let whitelistingUrl = URL(string: "")! // WHITELIST SERVICE
-        //"http://34.239.111.38:3000/whitelist"
 
         var request = URLRequest(url: whitelistingUrl)
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
